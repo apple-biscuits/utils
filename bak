@@ -1,0 +1,352 @@
+<template>
+  <div class="score-edit-container">
+    <h2 class="page-title">考研成绩单生成器</h2>
+    
+    <div class="main-content">
+      <div class="form-section">
+        <div class="section-title">个人信息</div>
+        <div class="personal-info">
+          <div class="info-group">
+            <label>姓名：</label>
+            <input v-model="studentInfo.name" placeholder="请输入姓名" class="input-field" />
+          </div>
+          <div class="info-group">
+            <label>报名号：</label>
+            <input v-model="studentInfo.registrationId" placeholder="请输入报名号" class="input-field" />
+          </div>
+          <div class="info-group">
+            <label>准考证号：</label>
+            <input v-model="studentInfo.examId" placeholder="请输入准考证号" class="input-field" />
+          </div>
+        </div>
+        
+        <div class="section-title">考试科目</div>
+        <div class="subjects-container">
+          <div v-for="(subject, index) in subjects" :key="index" class="input-group">
+            <div class="subject-prefix">{{ getSubjectPrefix(index) }}</div>
+            <input 
+              v-model="subject.name"
+              placeholder="科目名称"
+              class="input-field subject-name"
+            />
+            <input
+              v-model="subject.score"
+              placeholder="分数"
+              type="number"
+              class="input-field subject-score"
+            />
+          </div>
+          <button @click="addSubject" class="add-btn">+ 添加科目</button>
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <canvas ref="canvas" class="score-canvas"></canvas>
+        <div class="action-buttons">
+          <button @click="generateImage" class="download-btn">生成成绩单</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+
+const studentInfo = ref({
+  name: '',
+  registrationId: '',
+  examId: '',
+  totalScore: ''
+})
+
+const subjects = ref([{ name: '', score: '' }])
+const canvas = ref(null)
+
+const addSubject = () => {
+  subjects.value.push({ name: '', score: '' })
+}
+
+const getSubjectPrefix = (index) => {
+  const prefixes = ['第一门', '第二门', '第三门', '第四门']
+  return index < prefixes.length ? prefixes[index] : `第${index+1}门`
+}
+
+const generateImage = () => {
+  if (!subjects.value.some(s => s.name && s.score)) {
+    alert('请填写至少一个科目信息');
+    return;
+  }
+
+  // 计算总分
+  let totalScore = 0;
+  subjects.value.forEach(subject => {
+    if (subject.name && subject.score) {
+      totalScore += parseInt(subject.score) || 0;
+    }
+  });
+  studentInfo.value.totalScore = totalScore.toString();
+
+  const ctx = canvas.value.getContext('2d');
+  const scale = 2; // 提高分辨率
+  canvas.value.width = 600 * scale;
+  canvas.value.height = 800 * scale;
+  
+  // 绘制背景
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.value.width, canvas.value.height);
+  
+  // 绘制标题
+  ctx.fillStyle = '#333';
+  ctx.font = `${36 * scale}px '微软雅黑'`;
+  ctx.textAlign = 'center';
+  ctx.fillText('研究生入学考试成绩单', canvas.value.width/2, 80 * scale);
+
+  // 绘制个人信息
+  ctx.font = `${20 * scale}px '微软雅黑'`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#444';
+  
+  const infoStartY = 130 * scale;
+  const infoGap = 35 * scale;
+  
+  ctx.fillText(`姓名：${studentInfo.value.name}`, 100 * scale, infoStartY);
+  ctx.fillText(`报名号：${studentInfo.value.registrationId}`, 100 * scale, infoStartY + infoGap);
+  ctx.fillText(`准考证号：${studentInfo.value.examId}`, 100 * scale, infoStartY + infoGap * 2);
+  ctx.fillText(`总分：${studentInfo.value.totalScore}`, 100 * scale, infoStartY + infoGap * 3);
+
+  // 绘制表格
+  let y = 280 * scale;
+  
+  // 绘制表格线
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 1 * scale;
+  
+  // 表头横线
+  ctx.beginPath();
+  ctx.moveTo(80 * scale, y - 30 * scale);
+  ctx.lineTo(520 * scale, y - 30 * scale);
+  ctx.stroke();
+  
+  // 表头
+  ctx.font = `${20 * scale}px '微软雅黑'`;
+  ctx.fillStyle = '#666';
+  ctx.fillText('第一门：', 100 * scale, y);
+  
+  // 表格内容
+  ctx.fillStyle = '#444';
+  let subjectIndex = 1;
+  subjects.value.forEach((subject, index) => {
+    if(subject.name && subject.score) {
+      let subjectText = '';
+      switch(index) {
+        case 0: subjectText = '第一门：'; break;
+        case 1: subjectText = '第二门：'; break;
+        case 2: subjectText = '第三门：'; break;
+        case 3: subjectText = '第四门：'; break;
+        default: subjectText = `第${index+1}门：`;
+      }
+      
+      ctx.fillText(subjectText, 100 * scale, y);
+      ctx.fillText(`(${subject.name})：${subject.score}`, 200 * scale, y);
+      
+      // 每个科目下方的横线
+      ctx.beginPath();
+      ctx.moveTo(80 * scale, y + 10 * scale);
+      ctx.lineTo(520 * scale, y + 10 * scale);
+      ctx.stroke();
+      
+      y += 40 * scale;
+      subjectIndex++;
+    }
+  });
+  
+  // 绘制备注
+  y += 20 * scale;
+  ctx.fillText('备注：无', 100 * scale, y);
+  
+  // 绘制底部注释
+  y = 700 * scale;
+  ctx.font = `${14 * scale}px '微软雅黑'`;
+  ctx.fillStyle = '#999';
+  ctx.fillText('注：若查询的成绩为空值，表示有缺考、违纪等情况。若仍对查询的结果有疑问，请咨询相应的招生单位。', 100 * scale, y);
+
+  // 生成下载链接
+  const link = document.createElement('a');
+  link.download = '考研成绩单.png';
+  link.href = canvas.value.toDataURL('image/png');
+  link.click();
+}
+</script>
+
+<style scoped>
+.score-edit-container {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.page-title {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 2rem;
+  font-weight: 600;
+  font-size: 1.8rem;
+}
+
+.main-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+@media (min-width: 992px) {
+  .main-content {
+    flex-direction: row;
+  }
+  
+  .form-section {
+    flex: 1;
+  }
+  
+  .preview-section {
+    flex: 1;
+  }
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #1565c0;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.form-section {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.personal-info {
+  margin-bottom: 2rem;
+}
+
+.info-group {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.info-group label {
+  width: 100px;
+  font-weight: 500;
+  color: #555;
+}
+
+.subjects-container {
+  margin-top: 1rem;
+}
+
+.input-group {
+  display: grid;
+  grid-template-columns: 80px 2fr 1fr;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.subject-prefix {
+  color: #555;
+  font-weight: 500;
+  text-align: right;
+}
+
+.input-field {
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  width: 100%;
+  transition: border-color 0.3s;
+}
+
+.input-field:focus {
+  border-color: #1976D2;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+}
+
+.add-btn {
+  background: #4CAF50;
+  color: white;
+  padding: 0.8rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+.add-btn:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.score-canvas {
+  background: white;
+  border: 1px solid #ddd;
+  margin: 1rem 0;
+  max-width: 100%;
+  height: auto;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-radius: 4px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.download-btn {
+  background: #1976D2;
+  color: white;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 500;
+  transition: all 0.3s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.download-btn:hover {
+  background: #1565C0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.download-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+}
+</style>
