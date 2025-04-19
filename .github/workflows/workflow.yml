@@ -29,15 +29,16 @@ jobs:
       run: pnpm run build
  
   deploy:
-  environment:
-    name: github-pages
-    url: ${{ steps.deployment.outputs.page_url }}
-  needs: build
-  runs-on: ubuntu-latest
-  name: Deploy
-  steps:
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v4
-      with:
-        publish-dir: ./dist # 确保与构建步骤的输出目录一致
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
+    runs-on: ubuntu-latest
+    name: Deploy
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          publish-dir: ./dist
